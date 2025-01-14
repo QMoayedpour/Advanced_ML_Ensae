@@ -9,15 +9,16 @@ import plotly.express as px
 
 class Trainer(object):
 
-    def __init__(self, model, tickers=["VTI", "AGG", "DBC", "^VIX"], device="cuda:0"):
+    def __init__(self, model, tickers=["VTI", "AGG", "DBC", "^VIX"],
+                 device="cuda:0", synthetic=False):
         self.model = model
-        self.dataset = FinDataset(tickers=tickers)
+        self.dataset = FinDataset(tickers=tickers, synthetic=synthetic)
         self.tickers = tickers
         self.device = device
         self.result = None
 
         # Not custommable
-        self.optimizer = torch.optim.Adam(model.parameters(), lr=0.0001, weight_decay=0.2)
+        self.optimizer = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=0.2)
         self.scheduler_global = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=1, gamma=0.8)
 
     def _train_epoch(self, dataloader):
@@ -48,7 +49,7 @@ class Trainer(object):
         self.dataset.load_training_periods()
 
         for i in range(len(self.dataset.periods_train)):
-
+            
             self.logs[i] = {}
 
             dataloader, X_test, periods = self.dataset.loader_period(i, rolling_window,
@@ -116,7 +117,7 @@ class Trainer(object):
 
                 if len(estimation_data) > 0:
 
-                    mu, Sigma = estimation_data.mean().to_numpy(), estimation_data.cov()
+                    mu, Sigma = estimation_data.mean().to_numpy(), estimation_data.cov().to_numpy()
 
                     y_hat = self._compute_y_markowitz(mu, Sigma)
 
@@ -129,14 +130,13 @@ class Trainer(object):
 
                     result.loc[filtered_data.index, alloc_columns] = w
 
+        rt_pf = 0
 
-            rt_pf = 0
+        for i in range(len(returns_columns)):
+            rt_pf += result[alloc_columns[i]] * result[returns_columns[i]]
+        result['return_pf'] = rt_pf
 
-            for i in range(len(returns_columns)):
-                rt_pf += result[alloc_columns[i]] * result[returns_columns[i]]
-            result['return_pf'] = rt_pf
-
-            return result
+        return result
 
     def _compute_y_markowitz(self, mu, Sigma):
 
@@ -162,6 +162,7 @@ class Trainer(object):
             result = self.result.copy()
         else:
             result = df.copy()
+
         prices = self.dataset.prices()
 
         fig_prices = px.line(prices[prices.index.isin(result.dropna().index)], 

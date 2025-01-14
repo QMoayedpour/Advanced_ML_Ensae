@@ -1,26 +1,32 @@
 import yfinance as yf
 import pandas as pd
+import numpy as np
 from datetime import timedelta
 import torch
 from torch.utils.data import DataLoader, TensorDataset
 
 
 class FinDataset:
-    def __init__(self, tickers=['VTI', 'AGG', 'DBC', '^VIX'], start_date="2006-03-01", end_date="2020-12-31"):
+    def __init__(self, tickers=['VTI', 'AGG', 'DBC', '^VIX'], start_date="2006-03-01", end_date="2020-12-31",
+                 synthetic=False):
         """
         Initialise le dataset avec les tickers et les dates de début et de fin
         """
         self.tickers = tickers
         self.start_date = start_date
         self.end_date = end_date
-        self.data = self._get_data_yfinance()
+        self.data = self._get_data_yfinance(synthetic=synthetic)
     
-    def _get_data_yfinance(self):
+    def _get_data_yfinance(self, synthetic=False):
         """
         Télécharge les données financières de Yahoo Finance et les prépare (prix, rendements, etc.)
         """
         data = {}
         prices = yf.download(self.tickers, start=self.start_date, end=self.end_date, interval="1d")['Close']
+
+        if synthetic:
+            prices[self.tickers] = self.get_synthetic_data(prices.shape[0])
+
         prices.index = prices.index.tz_localize(None).floor('D')
         data["prices"] = prices
         returns = prices.pct_change() * 100
@@ -29,6 +35,27 @@ class FinDataset:
         returns_prices.columns = [f'{col}_St-1' for col in prices.columns] + [f'{col}_rt' for col in prices.columns]
         data["return_prices"] = returns_prices.dropna()
         return data
+
+    def get_synthetic_data(self, n=20):
+        mu = np.array([ 0.01056076, 0.00248467,  0.02553161,  0.01009022]) /100
+        Sigma = np.array([[ 1.01405883e-01, -9.62692257e-03, -3.00656688e-02,
+                2.62421178e-01],
+            [-9.62692257e-03,  1.47484256e-00,  7.06655188e-01,
+                -3.29981888e+00],
+            [-3.00656688e-02,  7.06655188e-01,  1.63707741e+00,
+                -7.46659065e+00],
+            [ 2.62421178e-01, -3.29981888e+00, -7.46659065e+00,
+                6.53481930e+01]])/100000
+
+        increments = np.random.multivariate_normal(mu, Sigma, size=n)
+
+        values = np.ones((n, 4))*100
+
+        for t in range(1, n):
+            values[t] = values[t-1] * (1 + increments[t])
+        
+        return values
+            
 
     def _generate_training_periods(self, initial_train_years=4, retrain_years=2):
         """
