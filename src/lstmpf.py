@@ -3,7 +3,8 @@ import torch.nn as nn
 
 
 class NN_Sharpe(nn.Module):
-    def __init__(self, input_size=4, hidden_size=64, output_size=4, num_layers=1, model_name='LSTM'):
+    def __init__(self, input_size=4, hidden_size=64, output_size=4, num_layers=1, model_name='LSTM',
+                 temperature=0.1):
         super(NN_Sharpe, self).__init__()
 
         self.num_layers = num_layers
@@ -18,7 +19,8 @@ class NN_Sharpe(nn.Module):
         else:
             raise ValueError("model_name not valid, select between ['LSTM', 'RNN', 'GRU']") 
         self.linear = nn.Linear(hidden_size, output_size)
-    
+        self.temperature = temperature
+
     def get_alloc(self, x):
 
         # x : shape[batch_size, seq_length, input_size]
@@ -38,11 +40,12 @@ class NN_Sharpe(nn.Module):
             output, hn = self.model(x)
             output, hn = output[:,:,:], hn[:, :, :]
 
+        #tanh_output = torch.tanh(output)
 
-        # shape of weights = [batch_size, seq_length, output_size]
         unnormalized_weights = self.linear(output)
-        normalized_weights = torch.softmax(unnormalized_weights, dim=-1)
+        scaled_weights = unnormalized_weights / self.temperature
 
+        normalized_weights = torch.softmax(scaled_weights, dim=-1)
         return normalized_weights
 
     def get_alloc_last(self, x):
