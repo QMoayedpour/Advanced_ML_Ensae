@@ -6,5 +6,5 @@ setup(
     packages=find_packages(),
     install_requires=["pandas", "torch", "numpy",
                       "matplotlib", "scikit-learn", "scipy",
-                      "tqdm"],
+                      "tqdm", "yfinance", "nbformat", "plotly", "cvxpy"],
 )
