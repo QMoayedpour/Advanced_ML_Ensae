@@ -10,7 +10,7 @@ import plotly.express as px
 class Trainer(object):
 
     def __init__(self, model, tickers=["VTI", "AGG", "DBC", "^VIX"],
-                 device="cuda:0", synthetic=False):
+                 device="cuda:0", synthetic=False, lr=0.001):
         self.model = model
         self.dataset = FinDataset(tickers=tickers, synthetic=synthetic)
         self.tickers = tickers
@@ -18,7 +18,7 @@ class Trainer(object):
         self.result = None
 
         # Not custommable
-        self.optimizer = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=0.2)
+        self.optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=0.2)
         self.scheduler_global = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=1, gamma=0.8)
 
     def _train_epoch(self, dataloader):
