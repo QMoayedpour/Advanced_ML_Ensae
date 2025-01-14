@@ -1,5 +1,6 @@
-from .dataset import FinDataset
+from src.dataset import FinDataset
 import pandas as pd
+import cvxpy as cp
 import torch
 import numpy as np
 from tqdm import trange
@@ -83,28 +84,101 @@ class Trainer(object):
         self.result = result
 
         return result
+    
+    def markov_portfolio(self, initial_train_years=4, retrain_years=2, rolling_window=50, 
+                        shuffle=False, batch_size=64, overlap=True, verbose=False):
+        result = self.dataset.returns().copy()
 
-    def plot_results(self):
+        for col in result.columns:
+            alloc_col = f"{col}_alloc"
+            result[alloc_col] = np.nan
 
-        if self.result is None:
+        self.dataset.load_training_periods()
+
+        for i in range(len(self.dataset.periods_train)):
+
+            _, X_test, periods = self.dataset.loader_period(i, rolling_window,
+                                                            batch_size, overlap,
+                                                            shuffle, verbose)
+
+            original_data = self.dataset.returns().copy()
+
+            train_start, train_end, test_start, test_end = periods
+
+            for test_date in pd.date_range(test_start, test_end, freq='B'):
+
+                train_data_end = test_date
+                train_data_start = train_data_end - pd.Timedelta(days=rolling_window)
+
+                estimation_data = original_data[(original_data.index < test_date)].tail(rolling_window)
+
+                estimation_data = estimation_data.dropna()
+
+                if len(estimation_data) > 0:
+
+                    mu, Sigma = estimation_data.mean().to_numpy(), estimation_data.cov()
+
+                    y_hat = self._compute_y_markowitz(mu, Sigma)
+
+                    w = y_hat / y_hat.sum()
+
+                    filtered_data = original_data[original_data.index == test_date]
+
+                    alloc_columns = [f"{col}_alloc" for col in result.columns if not col.endswith("_alloc")]
+                    returns_columns = [col for col in result.columns if not col.endswith("_alloc")]
+
+                    result.loc[filtered_data.index, alloc_columns] = w
+
+
+            rt_pf = 0
+
+            for i in range(len(returns_columns)):
+                rt_pf += result[alloc_columns[i]] * result[returns_columns[i]]
+            result['return_pf'] = rt_pf
+
+            return result
+
+    def _compute_y_markowitz(self, mu, Sigma):
+
+        y = cp.Variable(len(mu))
+
+        objective = cp.Minimize(cp.quad_form(y, Sigma))
+
+        constraints = [mu.T @ y == 1, y >= 0]
+
+        problem = cp.Problem(objective, constraints)
+
+        problem.solve()
+
+        return y.value
+
+
+    def plot_results(self, df=None):
+
+        if df is None and self.result is None:
             raise ValueError("Run the model first...")
+        
+        elif df is None:
+            result = self.result.copy()
+        else:
+            result = df.copy()
         prices = self.dataset.prices()
 
-        fig_prices = px.line(prices[prices.index.isin(self.result.dropna().index)], 
+        fig_prices = px.line(prices[prices.index.isin(result.dropna().index)], 
                              title="prices")
         fig_prices.show()
 
-        alloc_columns = [col for col in self.result.columns if col.endswith('_alloc')]
-        fig_allocations = px.line(self.result.dropna(), y=alloc_columns, 
+        alloc_columns = [col for col in result.columns if col.endswith('_alloc')]
+        fig_allocations = px.line(result.dropna(), y=alloc_columns, 
                                   title="allocations")
         fig_allocations.show()
 
-        N = self.result.dropna().shape[0]
-        log_returns_sum = np.sum(np.log(1+self.result['return_pf']/100))
+        N = result.dropna().shape[0]
+        log_returns_sum = np.sum(np.log(1+result['return_pf']/100))
         annual_rt = np.exp((252/N) * log_returns_sum) - 1
-        sharpe = self.result['return_pf'].mean() / self.result['return_pf'].std() * np.sqrt(252)
+        sharpe = result['return_pf'].mean() / result['return_pf'].std() * np.sqrt(252)
 
         print(f"nb de jours d'investissement: {N}\nannualized return: {annual_rt}")
         print(f"sharpe ratio: {sharpe}")
-        print(f"std deviation: {(self.result['return_pf']/100).std() * np.sqrt(252)}")
-        print(f"downside_risk:  { ((self.result[ self.result['return_pf']<0 ]['return_pf']) / 100).std() * np.sqrt(252)} ")
+        print(f"std deviation: {(result['return_pf']/100).std() * np.sqrt(252)}")
+        print(f"downside_risk:  { ((result[ result['return_pf']<0 ]['return_pf']) / 100).std() * np.sqrt(252)} ")
