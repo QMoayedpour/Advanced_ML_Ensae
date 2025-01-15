@@ -6,6 +6,7 @@ import torch
 from torch.utils.data import DataLoader, TensorDataset
 
 
+
 class FinDataset:
     def __init__(self, tickers=['VTI', 'AGG', 'DBC', '^VIX'], start_date="2006-03-01", end_date="2020-12-31",
                  synthetic=False):
@@ -37,6 +38,8 @@ class FinDataset:
         return data
 
     def get_synthetic_data(self, n=20):
+        
+        np.random.seed(702)
         mu = np.array([ 0.01056076, 0.00248467,  0.02553161,  0.01009022]) /100
         Sigma = np.array([[ 1.01405883e-01, -9.62692257e-03, -3.00656688e-02,
                 2.62421178e-01],

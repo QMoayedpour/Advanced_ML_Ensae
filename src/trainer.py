@@ -6,20 +6,28 @@ import numpy as np
 from tqdm import trange
 import plotly.express as px
 
+np.random.seed(702)
 
 class Trainer(object):
 
     def __init__(self, model, tickers=["VTI", "AGG", "DBC", "^VIX"],
-                 device="cuda:0", synthetic=False, lr=0.001):
+                 device=None, synthetic=False, lr=0.001, weight_decay=0.2, scheduler_gamma=0.8):
+        
+        self.scheduler_gamma = scheduler_gamma
+        self.weight_decay = weight_decay
         self.model = model
         self.dataset = FinDataset(tickers=tickers, synthetic=synthetic)
         self.tickers = tickers
-        self.device = device
+        
+        if device is None:
+            self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        else:
+            self.device = torch.device(device)
+            
         self.result = None
 
-        # Not custommable
-        self.optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=0.2)
-        self.scheduler_global = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=1, gamma=0.8)
+        self.optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=self.weight_decay)
+        self.scheduler_global = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=1, gamma=scheduler_gamma)
 
     def _train_epoch(self, dataloader):
         loss = []
@@ -46,7 +54,7 @@ class Trainer(object):
             alloc_col = f"{col}_alloc"
             result[alloc_col] = np.nan
 
-        self.dataset.load_training_periods()
+        self.dataset.load_training_periods(initial_train_years=initial_train_years, retrain_years=retrain_years)
 
         for i in range(len(self.dataset.periods_train)):
             
@@ -61,6 +69,8 @@ class Trainer(object):
             for _ in trange(epochs) if verbose else range(epochs):
 
                 loss_epochs.append(self._train_epoch(dataloader))
+                
+            self.scheduler_global.step()
 
             with torch.no_grad():
                 alloc_test = self.model.get_alloc_last(X_test.to(self.device)).cpu()
