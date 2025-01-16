@@ -11,12 +11,13 @@ np.random.seed(702)
 class Trainer(object):
 
     def __init__(self, model, tickers=["VTI", "AGG", "DBC", "^VIX"],
-                 device=None, synthetic=False, lr=0.001, weight_decay=0.2, scheduler_gamma=0.8):
+                 device=None, synthetic=False, lr=0.001, weight_decay=0.2, scheduler_gamma=0.5,
+                 randomstate=702):
         
         self.scheduler_gamma = scheduler_gamma
         self.weight_decay = weight_decay
         self.model = model
-        self.dataset = FinDataset(tickers=tickers, synthetic=synthetic)
+        self.dataset = FinDataset(tickers=tickers, synthetic=synthetic, randomstate=randomstate)
         self.tickers = tickers
         
         if device is None:

@@ -9,16 +9,17 @@ from torch.utils.data import DataLoader, TensorDataset
 
 class FinDataset:
     def __init__(self, tickers=['VTI', 'AGG', 'DBC', '^VIX'], start_date="2006-03-01", end_date="2020-12-31",
-                 synthetic=False):
+                 synthetic=False, randomstate=702):
         """
         Initialise le dataset avec les tickers et les dates de début et de fin
         """
         self.tickers = tickers
         self.start_date = start_date
         self.end_date = end_date
-        self.data = self._get_data_yfinance(synthetic=synthetic)
+        self.data = self._get_data_yfinance(synthetic=synthetic, randomstate=randomstate)
+
     
-    def _get_data_yfinance(self, synthetic=False):
+    def _get_data_yfinance(self, synthetic=False, randomstate=702):
         """
         Télécharge les données financières de Yahoo Finance et les prépare (prix, rendements, etc.)
         """
@@ -26,7 +27,7 @@ class FinDataset:
         prices = yf.download(self.tickers, start=self.start_date, end=self.end_date, interval="1d")['Close']
 
         if synthetic:
-            prices[self.tickers] = self.get_synthetic_data(prices.shape[0])
+            prices[self.tickers] = self.get_synthetic_data(prices.shape[0], randomstate=randomstate)
 
         prices.index = prices.index.tz_localize(None).floor('D')
         data["prices"] = prices
@@ -37,9 +38,9 @@ class FinDataset:
         data["return_prices"] = returns_prices.dropna()
         return data
 
-    def get_synthetic_data(self, n=20):
+    def get_synthetic_data(self, n=20, randomstate=702):
         
-        np.random.seed(702)
+        np.random.seed(randomstate)
         mu = np.array([ 0.01056076, 0.00248467,  0.02553161,  0.01009022]) /100
         Sigma = np.array([[ 1.01405883e-01, -9.62692257e-03, -3.00656688e-02,
                 2.62421178e-01],
