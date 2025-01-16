@@ -66,7 +66,7 @@ The report can be found on the folder ``report`` where you can find the whole la
 ![LSTM Allocation](./fig/allocations_lstm_synthetic.png)
 
 #### Markowitz portfolio Allocation on synthetic data (optimal)
-![MKZ Allocation](./fig/allocation_markow_synthetic.png)
+![MKZ Allocation](./fig/allocations_markow_synthetic.png)
 
 
 #### Results on real world dataset
