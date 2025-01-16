@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.cm as cm
 
 
 def plot_results(out, trainer):
@@ -84,6 +85,46 @@ def plot_cumulatives(list_results, list_names):
     ax.set_ylabel("Cumulative Return", fontsize=14)
     ax.legend(title="Models", fontsize=12)
     ax.grid(False)
+
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_stack(df):
+    filtered = df.dropna().copy()
+
+    colors = cm.viridis([0.2, 0.4, 0.6, 0.8])  # A harmonious colormap
+
+    plt.figure(figsize=(12, 8))
+
+    plt.stackplot(
+        filtered.index,
+        filtered["AGG_alloc"],
+        filtered["DBC_alloc"],
+        filtered["VTI_alloc"],
+        filtered["^VIX_alloc"],
+        labels=["AGG", "DBC", "VTI", "^VIX"],
+        colors=colors,
+        alpha=0.85
+    )
+
+    #plt.title("Portfolio Allocation Over Time", fontsize=16)
+    plt.xlabel("Time", fontsize=14)
+    plt.ylabel("Allocation", fontsize=14)
+
+    plt.yticks(fontsize=12)
+    plt.xticks(fontsize=12)
+    plt.grid(axis='y', linestyle='--', alpha=0.6)
+
+    plt.legend(
+        title="Assets",
+        fontsize=12,
+        title_fontsize=14,
+        loc="upper left",
+        frameon=True,
+        framealpha=0.9,
+        shadow=True
+    )
 
     plt.tight_layout()
     plt.show()
